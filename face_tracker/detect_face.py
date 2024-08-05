@@ -15,6 +15,7 @@ class DetectFace(Node):
         self.get_logger().info('Looking for the face...')
         self.image_sub = self.create_subscription(Image,"/image_in",self.callback,rclpy.qos.QoSPresetProfiles.SENSOR_DATA.value)
         self.image_out_pub = self.create_publisher(Image, "/image_out", 1)
+        self.face_capture_pub = self.create_publisher(Image, "/face_capture", 1)
         self.face_pub  = self.create_publisher(Point,"/detected_face",1)
         self.get_logger().info("loading cascade")
         self.face_cascade = cv2.CascadeClassifier('/home/dave/ws_opencv/src/ros2_face_tracker/face_tracker/facedetection.xml') 
@@ -31,25 +32,34 @@ class DetectFace(Node):
         try:
             
             frame = cv_image
-            reading =self.face_cascade.detectMultiScale(frame)
-            for (x,y,w,h) in reading:
-                cv2.rectangle(frame,(x,y),(x+w,y+h),(255,0,0),2)
-            print(frame[0]) #print the co-ordinates to the terminal.
-            # if frame.any():
-            #     self.velocity_message.linear.x = 0.2
-            #     self.pub_cmd.publish(self.velocity_message)
-            # else:
-            #     self.velocity_message.linear.x = 0.0
-            #     self.pub_cmd.publish(self.velocity_message)
+            face = cv_image
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            
+            reading =self.face_cascade.detectMultiScale(gray, 1.1, 4)
+            if 0 < len(reading):
+                for (x,y,w,h) in reading:
+                    cv2.rectangle(frame,(x,y),(x+w,y+h),(0,0,0),0)
+                    face = frame[y:y+h, x:x+w]
+                    face = cv2.resize(face, (512,512))
+                print(frame[0]) #print the co-ordinates to the terminal.
+                # if frame.any():
+                #     self.velocity_message.linear.x = 0.2
+                #     self.pub_cmd.publish(self.velocity_message)
+                # else:
+                #     self.velocity_message.linear.x = 0.0
+                #     self.pub_cmd.publish(self.velocity_message)
 
 
-            cv2.imshow("frame",cv_image)
+            cv2.imshow("frame", frame)
 
             
 
             img_to_pub = self.bridge.cv2_to_imgmsg(frame, "bgr8")
+            face_to_pub = self.bridge.cv2_to_imgmsg(face, "bgr8")
             img_to_pub.header = data.header
             self.image_out_pub.publish(img_to_pub)
+            face_to_pub.header = data.header
+            self.face_capture_pub.publish(face_to_pub)
 
             point_out = Point()
 
