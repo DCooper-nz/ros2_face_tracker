@@ -13,7 +13,7 @@ def generate_launch_description():
             output='screen',
             namespace='camera',
             parameters=[{
-                'image_size': [102,768],
+                'image_size': [1024,768],
                 'time_per_frame': [1, 6],
                 'camera_frame_id': 'camera_link_optical'
                 }]
