@@ -33,7 +33,7 @@ def generate_launch_description():
     image_topic = LaunchConfiguration('image_topic')
     image_topic_dec = DeclareLaunchArgument(
         'image_topic',
-        default_value='/camera/image_raw',
+        default_value='/camera/image_raw/decompressed',
         description='The name of the input image topic.')
 
     cmd_vel_topic = LaunchConfiguration('cmd_vel_topic')
@@ -42,6 +42,16 @@ def generate_launch_description():
     default_value='/cmd_vel',
     description='The name of the output command vel topic.')
 
+    decompress_node = Node(
+            package='image_transport',
+            executable='republish',
+            name = "decompress_node",
+            arguments=['compressed'],
+            remappings=[
+                    ('in/compressed','camera/image_raw/compressed'), 
+                    ('out','/camera/image_raw/decompressed'),
+            ]
+         )   
 
     detect_node = Node(
             package='face_tracker',
@@ -63,6 +73,7 @@ def generate_launch_description():
 
 
     return LaunchDescription([
+        decompress_node,
         detect_only_dec,
         follow_only_dec,
         use_sim_time_dec,

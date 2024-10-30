@@ -31,11 +31,13 @@ class DetectFace(Node):
             print(e)
 
         try:
-            
-            
+                        
             image = cv_image
-            face = cv_image
+            face = np.zeros((512,512,3), dtype=np.uint8)
             faceZ = 0
+            facePosX = 0
+            facePosY = 0
+            
             
             (h, w) = image.shape[:2]
             blob = cv2.dnn.blobFromImage(cv2.resize(image, (300, 300)), 1.0,
@@ -64,6 +66,9 @@ class DetectFace(Node):
                     faceCentre = (startX + endX) //2, (startY + endY) //2
                     faceZ = 1800 - ((endX - startX) + (endY - startY) * 3.5)
 
+                    facePosX = ((w/2) - faceCentre[0]) / (w/2)
+                    facePosY = ((h/2) - faceCentre[1]) / (h/2)
+
                     face = image.copy()[startY:endY, startX:endX]
                     
 
@@ -80,17 +85,15 @@ class DetectFace(Node):
                         cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 2)
                     cv2.putText(image, str(faceZ), (faceCentre),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                                        
-                                           
-                   
+
+                                     
                     try:
                         face = cv2.resize(face, (512,512))
                     except:
-                        face = cv_image
+                        face = np.zeros((512,512,3), dtype=np.uint8)
+
             # show the output image
             cv2.imshow("Output", image)
-
-
 
 
             img_to_pub = self.bridge.cv2_to_imgmsg(image, "bgr8")
@@ -100,10 +103,12 @@ class DetectFace(Node):
             face_to_pub.header = data.header
             self.face_capture_pub.publish(face_to_pub)
 
+        
+
             point_out = Point()
             if (faceZ > 0):
-                point_out.x = float(faceCentre[0])
-                point_out.y = float(faceCentre[1])
+                point_out.x = float(facePosX)
+                point_out.y = float(facePosY)
                 point_out.z = faceZ
 
             if (point_out.z > 0):

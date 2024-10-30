@@ -16,6 +16,8 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Point
 from geometry_msgs.msg import Twist
+from std_msgs.msg import Header
+from geometry_msgs.msg import TwistStamped
 import time
 
 class FollowFace(Node):
@@ -27,15 +29,19 @@ class FollowFace(Node):
             '/detected_face',
             self.listener_callback,
             10)
-        self.publisher_ = self.create_publisher(Twist, '/cmd_vel', 10)
+        #self.publisher_ = self.create_publisher(Twist, '/cmd_vel', 10)
+        self.publisher_ = self.create_publisher(TwistStamped, '/servo_node/delta_twist_cmds', 10)
 
-
+        self.frame_id = "link_0"
         self.declare_parameter("rcv_timeout_secs", 1.0)
-        self.declare_parameter("angular_chase_multiplier", 0.7)
+        self.declare_parameter("angular_chase_multiplier", 1)
         self.declare_parameter("forward_chase_speed", 0.1)
-        self.declare_parameter("search_angular_speed", 0.5)
+        self.declare_parameter("search_angular_speed", 0.0)
         self.declare_parameter("max_size_thresh", 0.1)
-        self.declare_parameter("filter_value", 0.9)
+        self.declare_parameter("filter_value", 0.1)
+        self.declare_parameter("offset_thresh", 0.1)
+        self.declare_parameter("dist_thresh", 0.05)
+        self.declare_parameter("dist_offset", 0.75)
 
 
         self.rcv_timeout_secs = self.get_parameter('rcv_timeout_secs').get_parameter_value().double_value
@@ -44,33 +50,50 @@ class FollowFace(Node):
         self.search_angular_speed = self.get_parameter('search_angular_speed').get_parameter_value().double_value
         self.max_size_thresh = self.get_parameter('max_size_thresh').get_parameter_value().double_value
         self.filter_value = self.get_parameter('filter_value').get_parameter_value().double_value
+        self.offset_thresh = self.get_parameter('offset_thresh').get_parameter_value().double_value
+        self.dist_thresh = self.get_parameter('dist_thresh').get_parameter_value().double_value
+        self.dist_offset = self.get_parameter('dist_offset').get_parameter_value().double_value
 
-
-        timer_period = 0.1  # seconds
+        timer_period = 0.05  # seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
-        self.target_val = 0.0
+        self.target_x_val = 0.0
+        self.target_y_val = 0.0
+        self.target_z_val = 0.8
         self.target_dist = 0.0
         self.lastrcvtime = time.time() - 10000
 
     def timer_callback(self):
-        msg = Twist()
+        msg = TwistStamped()
+        msg.header = Header()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = "link_0"
         if (time.time() - self.lastrcvtime < self.rcv_timeout_secs):
-            self.get_logger().info('Target: {}'.format(self.target_val))
-            print(self.target_dist)
-            if (self.target_dist < self.max_size_thresh):
-                msg.linear.x = self.forward_chase_speed
-            msg.angular.z = -self.angular_chase_multiplier*self.target_val
+            if (abs(self.target_x_val) > self.offset_thresh):
+                msg.twist.linear.x = -self.target_x_val          
+            if (abs(self.target_y_val) > self.offset_thresh):
+               msg.twist.linear.z = self.target_y_val
+
+            if (abs(self.target_dist - self.dist_offset) > self.dist_thresh):
+                msg.twist.linear.y = (self.target_dist - self.dist_offset) 
+
+
+            #self.get_logger().info('Sent: {} {}'.format(msg.twist.linear.x, msg.twist.linear.z))
         else:
             self.get_logger().info('Target lost')
-            msg.angular.z = self.search_angular_speed
+            msg.twist.linear.z = 0.0
+            msg.twist.linear.x = 0.0
+            msg.twist.linear.y = 0.0
+
         self.publisher_.publish(msg)
 
     def listener_callback(self, msg):
         f = self.filter_value
-        self.target_val = self.target_val * f + msg.x * (1-f)
-        self.target_dist = self.target_dist * f + msg.z * (1-f)
+        self.target_x_val = (self.target_x_val * f + msg.x * (1-f))
+        self.target_y_val = self.target_y_val * f + msg.y * (1-f)
+        self.target_dist = self.target_dist * f + (msg.z / 1000) * (1-f)
         self.lastrcvtime = time.time()
-        # self.get_logger().info('Received: {} {}'.format(msg.x, msg.y))
+        #self.get_logger().info('Received: {} {}'.format(msg.x, msg.y))
+        self.get_logger().info('Received: {}'.format(self.target_dist))
 
 
 def main(args=None):

@@ -36,6 +36,7 @@ class DetectFace(Node):
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             
             reading =self.face_cascade.detectMultiScale(gray, 1.1, 4)
+            
             if 0 < len(reading):
                 for (x,y,w,h) in reading:
                     cv2.rectangle(frame,(x,y),(x+w,y+h),(0,0,0),0)
